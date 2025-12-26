@@ -1,0 +1,54 @@
+controller_frequency: 5.0 #控制器的频率,当用move_base时，可以只设置controller_frequency参数，可以放心的忽略它
+recovery_behavior_enabled: false
+clearing_rotation_allowed: false
+
+
+DWAPlannerROS:
+  # 机器人配置参数
+  max_vel_x: 0.25  # 最大前进速度 (m/s)
+  min_vel_x: 0.05  # 最小前进速度，避免原地旋转 (m/s)
+  max_vel_y: 0.05  # 差分驱动机器人不能侧向移动
+  min_vel_y: -0.05
+  
+  max_vel_trans: 0.3  # 最大平移速度 (m/s)
+  min_vel_trans: 0.0  # 最小平移速度 (m/s)，关键参数，防止原地旋转
+  
+  max_vel_theta: 0.5  # 最大旋转速度 (rad/s)
+  min_vel_theta: 0.1  # 最小旋转速度 (rad/s)
+  
+  acc_lim_x: 2.0  # x方向加速度限制 (m/s^2)
+  acc_lim_y: 0.0  # y方向加速度限制
+  acc_lim_theta: 2.5  # 旋转加速度限制 (rad/s^2)
+  acc_lim_trans: 2.0  # 平移加速度限制 (m/s^2)
+  
+  # 目标容差
+  xy_goal_tolerance: 0.3  # 到达目标时的位置容差 (m)
+  yaw_goal_tolerance: 0.15  # 到达目标时的角度容差 (rad)，约8.6度
+  latch_xy_goal_tolerance: false
+  
+  # 前向模拟参数
+  sim_time: 1.5  # 前向模拟时间 (s)，轨迹预测时间
+  sim_granularity: 0.025  # 模拟步长 (m)
+  vx_samples: 10  # x方向速度采样数
+  vy_samples: 0  # y方向速度采样数（差分驱动设为0）
+  vtheta_samples: 20  # 角速度采样数
+  
+  # 轨迹评分参数（关键参数，影响路径跟踪行为）
+  path_distance_bias: 32.0  # 路径距离权重，数值越大越倾向于贴近全局路径
+  goal_distance_bias: 20.0  # 目标距离权重，数值越大越积极向目标前进
+  occdist_scale: 0.02  # 障碍物距离权重，数值越大越倾向于远离障碍物
+  forward_point_distance: 0.325  # 计算路径距离时机器人中心前方的参考点距离
+  stop_time_buffer: 0.2  # 停止时的时间缓冲
+  scaling_speed: 0.25  # 开始缩放速度的速度阈值
+  max_scaling_factor: 0.2  # 最大缩放因子
+  
+  # 振荡预防
+  oscillation_reset_dist: 0.05  # 振荡重置距离 (m)
+  oscillation_reset_angle: 0.2  # 振荡重置角度 (rad)
+  
+  # 调试
+  publish_traj_pc: true  # 发布轨迹点云用于可视化
+  publish_cost_grid_pc: false  # 发布代价地图点云
+  
+  # 其他
+  prune_plan: true  # 机器人移动时修剪已经走过的路径点

@@ -1,0 +1,38 @@
+# 忽略大文件和数据文件
+*.pcd
+*.bag
+*.pgm
+*.png
+*.jpg
+
+# 忽略 PCD 地图文件（太大）
+PCD/*.pcd
+PCD/*_*.pcd
+
+# 保留目录结构
+!PCD/.gitkeep
+!maps/.gitkeep
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# ROS 相关
+build/
+devel/
+*.log
+
+# IDE 相关
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db
+

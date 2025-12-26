@@ -1,0 +1,29 @@
+# robot_radius 定义了机器人的半径（单位：米）
+# 该参数用于代价地图（costmap）中估算机器人占据空间的大小
+# 路径规划与碰撞检测会参考该半径进行障碍物避让
+robot_radius: 0.4
+# inflation_radius 定义了障碍物膨胀区的半径（单位：米）
+# 当机器人需要避障时，实际障碍物会被膨胀为半径为 inflation_radius 的圆柱体
+# 膨胀区用于确保机器人能够安全地绕过障碍物
+inflation_radius: 0.5
+# obstacle_range 定义了传感器能够探测到的障碍物最大距离（单位：米）
+# 当传感器检测到距离超过 obstacle_range 的障碍物时，会被视为不可达区域
+obstacle_range: 6.0
+# raytrace_range 定义了传感器能够探测到的障碍物最大距离（单位：米）
+# 该参数用于代价地图（costmap）中计算障碍物与机器人之间的距离
+# 实际的障碍物膨胀与避障会参考该距离
+raytrace_range: 6.0
+# observation_sources 定义了传感器来源的名称
+# 这里定义了名为 base_lidar 的激光雷达传感器
+# 代价地图会根据该传感器的数据进行障碍物检测与膨胀
+observation_sources: base_lidar
+# base_lidar 定义了激光雷达传感器的基本配置
+# data_type 指定传感器数据类型为 LaserScan
+# topic 指定传感器数据的话题名为 /scan
+# marking 指定传感器数据是否用于障碍物标记
+base_lidar: {
+    data_type: LaserScan,
+    topic: /scan, 
+    marking: true, 
+    clearing: true
+    }
