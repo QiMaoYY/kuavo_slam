@@ -4,6 +4,7 @@
     
     <arg name="rviz" default="true" />
     <arg name="calibration_delay" default="12" /> <!-- 雷达校准等待时间，单位：秒 -->
+    <arg name="visual_downsample_ratio" default="100" /> <!-- 可视化降采样比例 N:1 -->
 
     <!-- 1. 启动 Livox MID360 雷达驱动（带自动校准） -->
     <include file="/media/data/livox_ws/src/livox_ros_driver2/launch_ROS1/autolevel_MID360.launch">
@@ -22,11 +23,18 @@
     <rosparam command="load" file="$(find faster_lio)/config/mid360.yaml" />
     <param name="runtime_pos_log_enable" type="bool" value="false" />
 
-    <!-- 4. 可视化 -->
+    <!-- 4. 可视化降采样节点（减少RViz负载） -->
+    <node pkg="kuavo_slam" type="visual_downsample.py" name="visual_downsample" output="screen"
+          launch-prefix="bash -c 'sleep $(arg calibration_delay); $0 $@'">
+        <param name="downsample_ratio" value="$(arg visual_downsample_ratio)" />
+        <param name="queue_size" value="10" />
+    </node>
+
+    <!-- 5. 可视化 -->
     <group if="$(arg rviz)">
         <node launch-prefix="bash -c 'sleep $(arg calibration_delay); nice $0 $@'" 
               pkg="rviz" type="rviz" name="rviz" 
-              args="-d $(find faster_lio)/config/rviz/faster_lio.rviz" />
+              args="-d $(find kuavo_slam)/config/mapping.rviz" />
     </group>
 
 </launch>
