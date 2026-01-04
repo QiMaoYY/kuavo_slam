@@ -4,6 +4,7 @@
 *.pgm
 *.png
 *.jpg
+maps/
 
 # 忽略 PCD 地图文件（太大）
 PCD/*.pcd
@@ -35,4 +36,6 @@ devel/
 # 系统文件
 .DS_Store
 Thumbs.db
+
+
 

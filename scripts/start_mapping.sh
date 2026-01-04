@@ -196,27 +196,14 @@ main() {
         roscore &
         sleep 3
     fi
-    
-    # 4. 启动雷达驱动
-    info "启动 Livox MID360 雷达驱动（带自动校准）..."
-    roslaunch livox_ros_driver2 autolevel_MID360.launch \
-        rviz_enable:=false \
-        xfer_format:=1 \
-        output_type:=0 &
-    LIDAR_PID=$!
-    
-    # 5. 等待校准完成
-    info "等待雷达校准完成（${CALIBRATION_WAIT_TIME} 秒）..."
-    for i in $(seq $CALIBRATION_WAIT_TIME -1 1); do
-        echo -ne "${YELLOW}倒计时: ${i} 秒\r${NC}"
-        sleep 1
-    done
-    echo ""
-    success "校准等待完成"
-    
-    # 6. 启动建图
+
+    # 4. 启动建图
     info "启动 Faster-LIO 建图..."
-    roslaunch faster_lio mapping_mid360.launch rviz:=true &
+    roslaunch kuavo_slam mapping.launch \
+        rviz:=true \
+        calibration_delay:=12 \
+        visual_downsample_ratio:=100 \
+        &
     MAPPING_PID=$!
     
     echo ""
@@ -229,7 +216,7 @@ main() {
     info "========================================="
     echo ""
     
-    # 7. 等待用户中断（Ctrl+C）
+    # 5. 等待用户中断（Ctrl+C）
     trap handle_interrupt SIGINT SIGTERM
     
     echo ""
@@ -242,14 +229,14 @@ main() {
         sleep 1
     done
     
-    # 8. 如果进程自然结束（未被中断），执行保存
+    # 6. 如果进程自然结束（未被中断），执行保存
     echo ""
     info "建图进程已结束，正在保存地图文件..."
     sleep 3  # 等待文件写入完成
     
     move_map_files
     
-    # 9. 清理
+    # 7. 清理
     cleanup
     
     echo ""

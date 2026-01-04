@@ -64,3 +64,6 @@ echo ""
 success "地图文件已保存到: ${MAP_SAVE_DIR}/"
 info "原始文件保留在: ${FASTER_LIO_PCD_DIR}/"
 
+
+
+
