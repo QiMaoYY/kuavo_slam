@@ -1,21 +1,19 @@
 <launch>
     <!-- Kuavo SLAM Mapping Entry -->
-    <!-- 此 Launch 文件将自动启动雷达驱动并等待其校准完成后启动建图 -->
+    <!-- 此 Launch 文件将自动启动雷达驱动并启动建图 -->
     
     <arg name="rviz" default="true" />
-    <arg name="calibration_delay" default="12" /> <!-- 雷达校准等待时间，单位：秒 -->
     <arg name="visual_downsample_ratio" default="100" /> <!-- 可视化降采样比例 N:1 -->
 
-    <!-- 1. 启动 Livox MID360 雷达驱动（带自动校准） -->
+    <!-- 1. 启动 Livox MID360 雷达驱动（不带自动校准） -->
     <include file="/media/data/livox_ws/src/livox_ros_driver2/launch_ROS1/autolevel_MID360.launch">
         <arg name="rviz_enable" value="false" /> <!-- 关闭雷达驱动自带的 RViz -->
         <arg name="xfer_format" value="1" /> <!-- 0=PointCloud2, 1=CustomMsg (Faster-LIO需要) -->
         <arg name="output_type" value="0" /> <!-- 0=发布到ROS, 1=只写bag文件 -->
     </include>
 
-    <!-- 2. 延迟启动 Faster-LIO 建图节点（等待雷达校准完成） -->
+    <!-- 2. 启动 Faster-LIO 建图节点 -->
     <node pkg="faster_lio" type="run_mapping_online" name="laserMapping" output="screen" 
-          launch-prefix="bash -c 'sleep $(arg calibration_delay); $0 $@'" 
           required="false">
     </node>
 
@@ -24,16 +22,14 @@
     <param name="runtime_pos_log_enable" type="bool" value="false" />
 
     <!-- 4. 可视化降采样节点（减少RViz负载） -->
-    <node pkg="kuavo_slam" type="visual_downsample.py" name="visual_downsample" output="screen"
-          launch-prefix="bash -c 'sleep $(arg calibration_delay); $0 $@'">
+    <node pkg="kuavo_slam" type="visual_downsample.py" name="visual_downsample" output="screen">
         <param name="downsample_ratio" value="$(arg visual_downsample_ratio)" />
         <param name="queue_size" value="10" />
     </node>
 
     <!-- 5. 可视化 -->
     <group if="$(arg rviz)">
-        <node launch-prefix="bash -c 'sleep $(arg calibration_delay); nice $0 $@'" 
-              pkg="rviz" type="rviz" name="rviz" 
+        <node pkg="rviz" type="rviz" name="rviz" 
               args="-d $(find kuavo_slam)/config/mapping.rviz" />
     </group>
 

@@ -1,15 +1,35 @@
 #!/bin/bash
 # Kuavo SLAM 建图启动脚本
-# 功能：启动雷达驱动 -> 等待校准 -> 启动建图 -> 完成后移动地图文件
+# 功能：启动雷达驱动 -> 自动校准 -> 启动建图 -> 完成后移动地图文件
+# 用法：./start_mapping.sh [--no-calib]
 
 set -e  # 遇到错误立即退出
 
 # ============== 配置参数 ==============
 LIVOX_WS="/media/data/livox_ws"
 SLAM_WS="/media/data/slam_ws"
-CALIBRATION_WAIT_TIME=12  # 雷达校准等待时间（秒）
 MAP_SAVE_DIR="${SLAM_WS}/src/kuavo_slam/PCD"
 FASTER_LIO_PCD_DIR="${SLAM_WS}/src/faster-lio/PCD"
+
+# 默认需要校准
+NEED_CALIBRATION=true
+
+# 解析命令行参数
+for arg in "$@"; do
+    case $arg in
+        --no-calib|--skip-calib)
+            NEED_CALIBRATION=false
+            shift
+            ;;
+        --help|-h)
+            echo "用法: $0 [选项]"
+            echo "选项:"
+            echo "  --no-calib, --skip-calib    跳过雷达校准步骤"
+            echo "  --help, -h                  显示此帮助信息"
+            exit 0
+            ;;
+    esac
+done
 
 # ============== 颜色输出 ==============
 RED='\033[0;31m'
@@ -190,6 +210,7 @@ main() {
         warn "未找到 Livox 工作空间: ${LIVOX_WS}/devel/setup.bash"
         info "将使用系统中已安装的 livox_ros_driver2"
     fi
+    
     # 3. 启动 roscore（如果未运行）
     if ! rostopic list &>/dev/null; then
         info "启动 roscore..."
@@ -197,11 +218,36 @@ main() {
         sleep 3
     fi
 
-    # 4. 启动建图
+    # 4. 自动校准（如果需要）
+    if [ "$NEED_CALIBRATION" = true ]; then
+        info "========================================="
+        info "  开始自动校准 MID360 雷达"
+        info "========================================="
+        python3 ${LIVOX_WS}/src/livox_ros_driver2/scripts/mid360_autolevel_calib.py \
+            --duration 3.0 \
+            --timeout 10.0 \
+            --imu-topic /livox/imu \
+            --lidar-topic /livox/lidar \
+            --fasterlio-yaml ${SLAM_WS}/src/faster-lio/config/mid360.yaml
+        
+        if [ $? -eq 0 ]; then
+            success "自动校准完成！"
+        else
+            error "校准失败，请检查雷达连接"
+            exit 1
+        fi
+        
+        info "========================================="
+        echo ""
+    else
+        warn "跳过校准步骤（使用已有外参）"
+        echo ""
+    fi
+
+    # 5. 启动建图
     info "启动 Faster-LIO 建图..."
     roslaunch kuavo_slam mapping.launch \
         rviz:=true \
-        calibration_delay:=12 \
         visual_downsample_ratio:=100 \
         &
     MAPPING_PID=$!
@@ -216,7 +262,7 @@ main() {
     info "========================================="
     echo ""
     
-    # 5. 等待用户中断（Ctrl+C）
+    # 6. 等待用户中断（Ctrl+C）
     trap handle_interrupt SIGINT SIGTERM
     
     echo ""
@@ -229,14 +275,14 @@ main() {
         sleep 1
     done
     
-    # 6. 如果进程自然结束（未被中断），执行保存
+    # 7. 如果进程自然结束（未被中断），执行保存
     echo ""
     info "建图进程已结束，正在保存地图文件..."
     sleep 3  # 等待文件写入完成
     
     move_map_files
     
-    # 7. 清理
+    # 8. 清理
     cleanup
     
     echo ""
