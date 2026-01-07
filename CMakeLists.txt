@@ -22,7 +22,7 @@ install(PROGRAMS
   scripts/transform_fusion.py
   scripts/publish_initial_pose.py
   scripts/start_mapping.sh
+  scripts/nav_run.sh
   scripts/save_map.sh
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
-

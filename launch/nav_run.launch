@@ -2,9 +2,9 @@
     <!-- Kuavo SLAM Localization Entry -->
     
     <arg name="rviz" default="true" />
-    <arg name="cmd_vel_topic" default="/cmd_vel" />
-    <arg name="map_pcd" default="$(find kuavo_slam)/PCD/scans.pcd" />
-    <arg name="map_yaml" default="$(find kuavo_slam)/maps/map.yaml" />
+    <arg name="cmd_vel_topic" default="/cmd_vel_nav" />
+    <arg name="map_pcd" default="$(find kuavo_slam)/maps/map_demo/map_demo_final.pcd" />
+    <arg name="map_yaml" default="$(find kuavo_slam)/maps/map_demo/map_demo.yaml" />
 
     <!-- 1. 加载参数 -->
     <rosparam command="load" file="$(find kuavo_slam)/config/mid360_nav.yaml" />
@@ -12,8 +12,12 @@
     <param name="point_filter_num" type="int" value="3"/>
     <param name="filter_size_surf" type="double" value="0.5" />
     
-    <!-- 2. 运行 Faster-LIO 的变换节点 (只定位，不建图) -->
-    <node pkg="faster_lio" type="run_lidar_transform" name="lidarTransform" output="screen" />
+    <!-- 2. 运行livox_ros_driver2节点 (只定位，不建图) -->
+    <include file="$(find livox_ros_driver2)/launch_ROS1/autolevel_MID360.launch">
+        <arg name="rviz_enable" value="false" />
+        <arg name="xfer_format" value="0" />
+        <arg name="output_type" value="0" />
+    </include>
 
     <!-- 3. 全局 ICP 定位 (从 kuavo_slam 运行) -->
     <node pkg="kuavo_slam" type="global_localization.py" name="global_localization" output="screen" />
@@ -37,7 +41,7 @@
 
     <!-- 8. 点云转激光雷达数据 (用于避障) -->
     <node pkg="pointcloud_to_laserscan" type="pointcloud_to_laserscan_node" name="pointcloud_to_laserscan">
-        <remap from="cloud_in" to="/cur_scan_in_map"/>
+        <remap from="cloud_in" to="/livox/lidar"/>
         <param name="use_inf" value="true" />
         <param name="inf_epsilon" value="1.0" />
         <param name="concurrency_level" value="1" />

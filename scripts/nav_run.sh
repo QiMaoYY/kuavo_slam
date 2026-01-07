@@ -1,7 +1,7 @@
 #!/bin/bash
-# Kuavo SLAM 建图启动脚本
-# 功能：启动雷达驱动 -> 自动校准 -> 启动建图 -> 完成后移动地图文件
-# 用法：./start_mapping.sh [--no-calib]
+# Kuavo SLAM 导航启动脚本
+# 功能：启动雷达驱动 -> 全局定位 -> 坐标系融合 -> 可视化
+# 用法：./nav_run.sh
 
 set -e  # 遇到错误立即退出
 
@@ -57,7 +57,7 @@ error() {
 
 # 清理函数
 cleanup() {
-    info "正在清理并关闭建图相关节点..."
+    info "正在清理并关闭所有节点..."
     
     # 温和地结束进程（给它们时间保存数据）
     info "  停止建图节点..."
@@ -65,11 +65,7 @@ cleanup() {
     sleep 1
     
     info "  停止雷达驱动..."
-    # 只杀死本脚本启动的roslaunch，通过进程组ID
-    if [ -n "$MAPPING_PID" ]; then
-        # 获取roslaunch子进程
-        pkill -P $MAPPING_PID 2>/dev/null || true
-    fi
+    killall -INT roslaunch 2>/dev/null || true
     sleep 1
     
     info "  停止可视化..."
@@ -77,17 +73,17 @@ cleanup() {
     sleep 1
     
     # 如果还有残留，强制杀死
+    killall -9 roslaunch 2>/dev/null || true
     killall -9 rviz 2>/dev/null || true
     killall -9 run_mapping_online 2>/dev/null || true
     
-    # 只清理建图相关的ROS节点，不要杀死所有节点
-    info "  清理建图相关 ROS 节点..."
-    rosnode kill /laserMapping 2>/dev/null || true
-    rosnode kill /livox_lidar_publisher2 2>/dev/null || true
-    rosnode kill /visual_downsample 2>/dev/null || true
-    rosnode kill /rviz 2>/dev/null || true
+    # 清理 ROS 节点（设置超时避免卡死）
+    info "  清理 ROS 节点..."
+    timeout 3 rosnode kill -a 2>/dev/null || true
     
-    # 不要关闭 rosmaster/roscore（它们可能被其他节点使用）
+    # 关闭 rosmaster（如果是脚本启动的）
+    killall -9 rosmaster 2>/dev/null || true
+    killall -9 roscore 2>/dev/null || true
     
     success "清理完成"
 }
@@ -101,87 +97,24 @@ handle_interrupt() {
     killall -INT roslaunch 2>/dev/null || true
     sleep 2
     
-    # 保存地图
-    echo ""
-    info "正在保存地图文件..."
-    sleep 3  # 等待文件写入完成
-    move_map_files
     
     # 清理
     cleanup
     
     echo ""
     success "========================================="
-    success "  建图流程完成！"
-    success "  地图保存位置: ${MAP_SAVE_DIR}/"
+    success "  导航流程完成！"
     success "========================================="
     
     exit 0
 }
 
-# 移动地图文件
-move_map_files() {
-    info "检查生成的地图文件..."
-    info "源目录: ${FASTER_LIO_PCD_DIR}"
-    info "目标目录: ${MAP_SAVE_DIR}"
-    
-    # 检查源目录
-    if [ ! -d "${FASTER_LIO_PCD_DIR}" ]; then
-        warn "未找到 Faster-LIO 的 PCD 目录: ${FASTER_LIO_PCD_DIR}"
-        warn "可能建图时间太短，未生成地图文件"
-        return 0  # 返回 0 避免脚本中断
-    fi
-    
-    # 列出目录内容（调试用）
-    info "PCD 目录内容："
-    ls -lh "${FASTER_LIO_PCD_DIR}" 2>/dev/null || true
-    
-    # 创建目标目录
-    mkdir -p "${MAP_SAVE_DIR}"
-    
-    # 查找并移动所有 PCD 文件
-    pcd_files=$(find "${FASTER_LIO_PCD_DIR}" -maxdepth 1 -name "*.pcd" 2>/dev/null)
-    
-    if [ -z "$pcd_files" ]; then
-        warn "未找到任何 PCD 地图文件"
-        warn "请检查建图配置: ${SLAM_WS}/src/faster-lio/config/mid360.yaml"
-        warn "确保 pcd_save_en: true"
-        return 0  # 返回 0 避免脚本中断
-    fi
-    
-    info "找到以下地图文件："
-    echo "$pcd_files"
-    echo ""
-    
-    for pcd_file in $pcd_files; do
-        filename=$(basename "$pcd_file")
-        target_path="${MAP_SAVE_DIR}/${filename}"
-        
-        info "正在处理: $filename"
-        
-        # 如果目标文件存在，添加时间戳备份
-        if [ -f "$target_path" ]; then
-            timestamp=$(date +%Y%m%d_%H%M%S)
-            backup_path="${MAP_SAVE_DIR}/${filename%.pcd}_${timestamp}.pcd"
-            warn "目标文件已存在，备份为: $(basename $backup_path)"
-            mv "$target_path" "$backup_path"
-        fi
-        
-        mv "$pcd_file" "$target_path"
-        success "已移动: $filename -> ${MAP_SAVE_DIR}/"
-    done
-    
-    echo ""
-    success "地图文件已保存到: ${MAP_SAVE_DIR}/"
-    success "请使用以下命令查看："
-    info "  ls -lh ${MAP_SAVE_DIR}/"
-}
 
 # ============== 主流程 ==============
 main() {
     echo ""
     info "========================================="
-    info "   Kuavo SLAM 建图启动脚本"
+    info "   Kuavo SLAM 导航启动脚本"
     info "========================================="
     echo ""
     
@@ -248,21 +181,15 @@ main() {
         echo ""
     fi
 
-    # 5. 启动建图
-    info "启动 Faster-LIO 建图..."
-    roslaunch kuavo_slam mapping.launch \
+    # 5. 启动导航
+    info "启动导航..."
+    roslaunch kuavo_slam nav_run.launch \
         rviz:=true \
-        visual_downsample_ratio:=100 \
         &
-    MAPPING_PID=$!
+    NAV_PID=$!
     
     echo ""
-    success "建图已启动！"
-    info "========================================="
-    info "建图提示："
-    info "  - 请移动机器人进行地图采集"
-    info "  - 建图完成后，按 Ctrl+C 停止"
-    info "  - 脚本会自动保存地图到 kuavo_slam/PCD/"
+    success "导航已启动！"
     info "========================================="
     echo ""
     
@@ -270,29 +197,26 @@ main() {
     trap handle_interrupt SIGINT SIGTERM
     
     echo ""
-    info "建图正在进行中..."
-    info "按 Ctrl+C 停止建图并自动保存地图"
+    info "导航正在进行中..."
+    info "按 Ctrl+C 停止导航"
     echo ""
     
     # 持续等待（直到用户按 Ctrl+C 或进程结束）
-    while kill -0 $MAPPING_PID 2>/dev/null; do
+    while kill -0 $NAV_PID 2>/dev/null; do
         sleep 1
     done
     
     # 7. 如果进程自然结束（未被中断），执行保存
     echo ""
-    info "建图进程已结束，正在保存地图文件..."
+    info "导航进程已结束"
     sleep 3  # 等待文件写入完成
-    
-    move_map_files
     
     # 8. 清理
     cleanup
     
     echo ""
     success "========================================="
-    success "  建图流程完成！"
-    success "  地图保存位置: ${MAP_SAVE_DIR}/"
+    success "  导航流程完成！"
     success "========================================="
 }
 

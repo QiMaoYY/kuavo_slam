@@ -250,10 +250,10 @@ def cb_save_cur_scan(pc_msg):
     pc_msg.header.stamp = rospy.Time().now()
     pub_pc_in_body.publish(pc_msg)
     # 转换为pcd
-    # fastlio给的field有问题 处理一下
-    pc_msg.fields = [pc_msg.fields[0], pc_msg.fields[1], pc_msg.fields[2],
-                     pc_msg.fields[4], pc_msg.fields[5], pc_msg.fields[6],
-                     pc_msg.fields[3], pc_msg.fields[7]]
+    # # fastlio给的field有问题 处理一下
+    # pc_msg.fields = [pc_msg.fields[0], pc_msg.fields[1], pc_msg.fields[2],
+    #                  pc_msg.fields[4], pc_msg.fields[5], pc_msg.fields[6],
+    #                  pc_msg.fields[3], pc_msg.fields[7]]
     cur_scan = msg_to_array(pc_msg)
 
 
@@ -307,7 +307,7 @@ if __name__ == '__main__':
     pub_submap = rospy.Publisher('/submap', PointCloud2, queue_size=1)
     pub_map_to_odom = rospy.Publisher('/map_to_odom', Odometry, queue_size=1)
 
-    rospy.Subscriber('/cloud_registered_body', PointCloud2, cb_save_cur_scan, queue_size=1)
+    rospy.Subscriber('/livox/lidar', PointCloud2, cb_save_cur_scan, queue_size=1)
     rospy.Subscriber('/odom', Odometry, cb_save_cur_odom, queue_size=1)
 
     # 初始化全局地图
