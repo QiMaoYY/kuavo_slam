@@ -1,6 +1,6 @@
 #!/bin/bash
 # Kuavo SLAM 建图启动脚本
-# 功能：启动雷达驱动 -> 自动校准 -> 启动建图 -> 完成后移动地图文件
+# 功能：启动雷达驱动 -> 自动校准 -> 启动建图
 # 用法：./start_mapping.sh [--no-calib]
 
 set -e  # 遇到错误立即退出
@@ -8,8 +8,6 @@ set -e  # 遇到错误立即退出
 # ============== 配置参数 ==============
 LIVOX_WS="/media/data/livox_ws"
 SLAM_WS="/media/data/slam_ws"
-MAP_SAVE_DIR="${SLAM_WS}/src/kuavo_slam/PCD"
-FASTER_LIO_PCD_DIR="${SLAM_WS}/src/faster-lio/PCD"
 
 # 默认需要校准
 NEED_CALIBRATION=true
@@ -101,11 +99,10 @@ handle_interrupt() {
     killall -INT roslaunch 2>/dev/null || true
     sleep 2
     
-    # 保存地图
+    # 等待地图写入完成
     echo ""
-    info "正在保存地图文件..."
-    sleep 3  # 等待文件写入完成
-    move_map_files
+    info "等待地图文件写入完成..."
+    sleep 3
     
     # 清理
     cleanup
@@ -113,69 +110,11 @@ handle_interrupt() {
     echo ""
     success "========================================="
     success "  建图流程完成！"
-    success "  地图保存位置: ${MAP_SAVE_DIR}/"
     success "========================================="
     
     exit 0
 }
 
-# 移动地图文件
-move_map_files() {
-    info "检查生成的地图文件..."
-    info "源目录: ${FASTER_LIO_PCD_DIR}"
-    info "目标目录: ${MAP_SAVE_DIR}"
-    
-    # 检查源目录
-    if [ ! -d "${FASTER_LIO_PCD_DIR}" ]; then
-        warn "未找到 Faster-LIO 的 PCD 目录: ${FASTER_LIO_PCD_DIR}"
-        warn "可能建图时间太短，未生成地图文件"
-        return 0  # 返回 0 避免脚本中断
-    fi
-    
-    # 列出目录内容（调试用）
-    info "PCD 目录内容："
-    ls -lh "${FASTER_LIO_PCD_DIR}" 2>/dev/null || true
-    
-    # 创建目标目录
-    mkdir -p "${MAP_SAVE_DIR}"
-    
-    # 查找并移动所有 PCD 文件
-    pcd_files=$(find "${FASTER_LIO_PCD_DIR}" -maxdepth 1 -name "*.pcd" 2>/dev/null)
-    
-    if [ -z "$pcd_files" ]; then
-        warn "未找到任何 PCD 地图文件"
-        warn "请检查建图配置: ${SLAM_WS}/src/faster-lio/config/mid360.yaml"
-        warn "确保 pcd_save_en: true"
-        return 0  # 返回 0 避免脚本中断
-    fi
-    
-    info "找到以下地图文件："
-    echo "$pcd_files"
-    echo ""
-    
-    for pcd_file in $pcd_files; do
-        filename=$(basename "$pcd_file")
-        target_path="${MAP_SAVE_DIR}/${filename}"
-        
-        info "正在处理: $filename"
-        
-        # 如果目标文件存在，添加时间戳备份
-        if [ -f "$target_path" ]; then
-            timestamp=$(date +%Y%m%d_%H%M%S)
-            backup_path="${MAP_SAVE_DIR}/${filename%.pcd}_${timestamp}.pcd"
-            warn "目标文件已存在，备份为: $(basename $backup_path)"
-            mv "$target_path" "$backup_path"
-        fi
-        
-        mv "$pcd_file" "$target_path"
-        success "已移动: $filename -> ${MAP_SAVE_DIR}/"
-    done
-    
-    echo ""
-    success "地图文件已保存到: ${MAP_SAVE_DIR}/"
-    success "请使用以下命令查看："
-    info "  ls -lh ${MAP_SAVE_DIR}/"
-}
 
 # ============== 主流程 ==============
 main() {
@@ -279,12 +218,10 @@ main() {
         sleep 1
     done
     
-    # 7. 如果进程自然结束（未被中断），执行保存
+    # 7. 如果进程自然结束（未被中断），等待地图写入
     echo ""
-    info "建图进程已结束，正在保存地图文件..."
+    info "建图进程已结束，等待地图文件写入完成..."
     sleep 3  # 等待文件写入完成
-    
-    move_map_files
     
     # 8. 清理
     cleanup
@@ -292,7 +229,6 @@ main() {
     echo ""
     success "========================================="
     success "  建图流程完成！"
-    success "  地图保存位置: ${MAP_SAVE_DIR}/"
     success "========================================="
 }
 
