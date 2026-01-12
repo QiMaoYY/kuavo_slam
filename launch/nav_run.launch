@@ -40,8 +40,9 @@
     </node>
 
     <!-- 8. 点云转激光雷达数据 (用于避障) -->
+    <node pkg="tf" type="static_transform_publisher" name="base_link_2d" args="0 0 0 0 0 0 base_link base_link_2d_nav 100" />
     <node pkg="pointcloud_to_laserscan" type="pointcloud_to_laserscan_node" name="pointcloud_to_laserscan">
-        <remap from="cloud_in" to="/livox/lidar"/>
+        <remap from="cloud_in" to="/cur_scan_in_map"/>
         <param name="use_inf" value="true" />
         <param name="inf_epsilon" value="1.0" />
         <param name="concurrency_level" value="1" />
@@ -50,25 +51,49 @@
         <param name="range_min" value="0.05" />
         <param name="range_max" value="30.0" />
         <param name="transform_tolerance" value="0.01" />
-        <param name="min_height" value="0.1" />
-        <param name="max_height" value="1.5" />
+        <param name="min_height" value="-1.4" />
+        <param name="max_height" value="0.8" />
         <param name="angle_min" value="-1.5708" />
         <param name="angle_max" value="1.5708" />
     </node>
 
-    <!-- 9. 导航节点 (move_base) -->
-    <node pkg="move_base" type="move_base" name="move_base">
-        <rosparam file="$(find kuavo_slam)/nav_lidar/costmap_common_params.yaml" command="load" ns="global_costmap" />
-        <rosparam file="$(find kuavo_slam)/nav_lidar/costmap_common_params.yaml" command="load" ns="local_costmap" />
-        <rosparam file="$(find kuavo_slam)/nav_lidar/global_costmap_params.yaml" command="load" />
-        <rosparam file="$(find kuavo_slam)/nav_lidar/local_costmap_params.yaml" command="load" />
-        <rosparam file="$(find kuavo_slam)/nav_lidar/local_planner_params.yaml" command="load" />
-        <param name="base_global_planner" value="global_planner/GlobalPlanner" />
-        <param name="base_local_planner" value="dwa_local_planner/DWAPlannerROS" />
+    <arg name="config_dir" default="$(find kuavo_slam)/config" />
+    <arg name="base_global_planner" default="global_planner" /> <!--"navfn" or "global_planner" -->
+    <arg name="base_local_planner" default="teb_local_planner" />
+    <arg name="nav_base_frame" default="base_link" />
+    <arg name="odom_topic" default="/localization" />
+    <arg name="local_costmap_global_frame" default="world" />
+
+    <node pkg="tf" type="static_transform_publisher" name="world_to_map" args="0 0 0 0 0 0 map world 100" />
+    <!-- 启动 move_base -->
+    <node pkg="move_base" type="move_base" name="move_base" output="screen">
+        <rosparam file="$(arg config_dir)/nav_2d/$(arg base_global_planner)_params.yaml" command="load" />
+        <rosparam file="$(arg config_dir)/nav_2d/$(arg base_local_planner)_params.yaml" command="load" />
+        <rosparam file="$(arg config_dir)/nav_2d/move_base_params.yaml" command="load" />
+        <rosparam file="$(arg config_dir)/nav_2d/costmap_common_params.yaml" command="load" ns="global_costmap" />
+        <rosparam file="$(arg config_dir)/nav_2d/costmap_common_params.yaml" command="load" ns="local_costmap" />
+        <rosparam file="$(arg config_dir)/nav_2d/global_costmap_params.yaml" command="load" />
+        <rosparam file="$(arg config_dir)/nav_2d/local_costmap_params.yaml" command="load" />
+
+        <param name="base_global_planner" value="global_planner/GlobalPlanner" if="$(eval base_global_planner == 'global_planner')"/>
+        <param name="base_global_planner" value="navfn/NavfnROS" if="$(eval base_global_planner == 'navfn')"/>
+        <param name="base_local_planner" value="dwa_local_planner/DWAPlannerROS" if="$(eval base_local_planner == 'dwa_local_planner')" />
+        <param name="base_local_planner" value="mpc_local_planner/MpcLocalPlannerROS" if="$(eval base_local_planner == 'mpc_local_planner')" />
+        <param name="base_local_planner" value="teb_local_planner/TebLocalPlannerROS" if="$(eval base_local_planner == 'teb_local_planner')" />
+
         <remap from="/map" to="/map2d" />
-        <remap from="odom" to="/localization" />
+        <remap from="odom" to="$(arg odom_topic)" />
         <remap from="cmd_vel" to="$(arg cmd_vel_topic)" />
+
+        <!-- 统一设置odom话题（适用于所有局部规划器） -->
+        <param name="DWAPlannerROS/odom_topic" value="$(arg odom_topic)"/>
+        <param name="MpcLocalPlannerROS/odom_topic" value="$(arg odom_topic)"/>
+        <param name="TebLocalPlannerROS/odom_topic" value="$(arg odom_topic)"/>
+
+        <!-- 统一设置frame（适用于全局和局部代价地图） -->
+        <param name="global_costmap/robot_base_frame" value="$(arg nav_base_frame)"/>
+        <param name="local_costmap/robot_base_frame" value="$(arg nav_base_frame)"/>
+        <param name="local_costmap/global_frame" value="$(arg local_costmap_global_frame)"/>
     </node>
 
 </launch>
-

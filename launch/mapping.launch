@@ -13,9 +13,7 @@
     </include>
 
     <!-- 2. 启动 Faster-LIO 建图节点 -->
-    <node pkg="faster_lio" type="run_mapping_online" name="laserMapping" output="screen" 
-          required="false">
-    </node>
+    <node pkg="faster_lio" type="run_mapping_online" name="laserMapping" output="screen" required="false" />
 
     <!-- 3. 加载 Faster-LIO 建图参数 -->
     <rosparam command="load" file="$(find faster_lio)/config/mid360.yaml" />
