@@ -1,0 +1,73 @@
+DWAPlannerROS:
+
+  #Robot Configuration Parameters
+  min_vel_x: 1.2 #后退最大速度
+  max_vel_x: 1.2 #前进最大速度
+  acc_lim_x: 0.3 #正加速度
+  neg_acc_lim_x: 0.6 #负的线加速度（减速度）,减速度要尽量大一些，避免出现错过目标点
+
+  min_rot_vel: 0.0
+  max_rot_vel: 0.5 #最大角速度
+  acc_lim_theta: 0.35 #正加速度
+  neg_acc_lim_theta: 0.4 #负的角加速度（减速度）,减速度要尽量大一些，避免出现错过目标点
+
+  min_trans_vel: -0.25
+  max_trans_vel: 1.0  #自旋角速度
+  acc_limit_trans: 0.25
+
+  #Goal Tolerance Parameters
+  xy_goal_tolerance: 0.1 #纯导航到达允许的误差，位置误差
+  yaw_goal_tolerance: 0.05 #纯导航到达允许的误差，角度朝向误差
+
+  #Minimum velocity for the robot to be considered not stop
+  trans_stopped_vel: 0.1
+  rot_stopped_vel: 0.1
+
+  #Stopped limit acc
+  acc_stopped_trans: 3.0 #刹车线加速度
+  acc_stopped_rot: 2.0 #刹车角加速度
+
+  #Forward Simulation Parameters
+  sim_time: 2.0
+  vx_samples: 10
+  vth_samples: 20
+  sim_granularity: 0.05 #仿真线间隔尺寸，决定了仿真的路线长度及计算速度，越大越长
+  angular_sim_granularity: 0.1 #仿真角度间隔尺寸，决定了仿真的路线长度及计算速度，越大越宽
+  sampling_distance: 0.4 #采用距离，距离越大，导航走直行不会摇摆，但在通道大角度拐弯越差；
+
+  #Trajectory Scoring Parameters
+  path_distance_bias: 4.0
+  goal_distance_bias: 1.4
+  occdist_scale: 0.2  #越大，导航在通过窄通道越保守（速度越低），反之越激进
+  forward_point_distance: 0.25
+  scaling_speed: 0.25
+  max_scaling_factor: 0.2
+  cheat_factor: 1.0
+
+  #Oscillation Prevention Parameters
+  oscillation_reset_dist: 0.05
+  oscillation_reset_angle: 0.2
+
+  #wooshRobo
+  cost_scaling_factor: 10.0
+  dist1: 0.05
+  dist2: 0.4
+  scale_v: 10.0
+  robot_radius_scale: 0.95 #避障的通道宽度
+  stop_wating_distance: 0.6
+  #curve_knee_scale: 0.5
+
+  
+  use_local_navfn: false
+  init_padding_x: 0.015
+  turn_padding_x: 0.05       #机器人在odwa导航过程中，与路径方向的姿态偏差过大时，满足旋转padding区域内没有障碍物再进行减速停止旋转矫正。
+  forward_padding_x: 0.25     #
+  dircfg: false                #导航方向,true:沿着路经方向走，不管是车头还是车尾；false：根据策略选择前进还是后退导航
+
+  #For debug
+  publish_traj_pc: false
+  publish_cost_grid_pc: false
+
+  #Others
+  safety_dist: 0.1
+  vy_samples: 1

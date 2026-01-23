@@ -1,0 +1,11 @@
+velocity_smoother:
+  use_feedback: false
+  max_velocity: [1.0, 0.0, 1.0]
+  min_velocity: [-0.3, 0.0, -1.0]
+  max_accel: [0.3, 0.3, 0.3]
+  max_decel: [-1.0, -1.0, -2.0]
+  velocity_timeout: 0.5
+  deadband_velocity: [0.01, 0.01, 0.01]
+  smoothing_frequency: 20.0
+  cmd_vel_input_topic: /nav_cmd_vel_raw
+  cmd_vel_output_topic: /nav_cmd_vel
