@@ -6,7 +6,7 @@
     <arg name="visual_downsample_ratio" default="100" /> <!-- 可视化降采样比例 N:1 -->
 
     <!-- 1. 启动 Livox MID360 雷达驱动（不带自动校准） -->
-    <include file="/media/data/livox_ws/src/livox_ros_driver2/launch_ROS1/autolevel_MID360.launch">
+    <include file="$(find livox_ros_driver2)/launch_ROS1/autolevel_MID360.launch">
         <arg name="rviz_enable" value="false" /> <!-- 关闭雷达驱动自带的 RViz -->
         <arg name="xfer_format" value="1" /> <!-- 0=PointCloud2, 1=CustomMsg (Faster-LIO需要) -->
         <arg name="output_type" value="0" /> <!-- 0=发布到ROS, 1=只写bag文件 -->
@@ -16,7 +16,7 @@
     <node pkg="faster_lio" type="run_mapping_online" name="laserMapping" output="screen" required="false" />
 
     <!-- 3. 加载 Faster-LIO 建图参数 -->
-    <rosparam command="load" file="$(find faster_lio)/config/mid360.yaml" />
+    <rosparam command="load" file="$(find faster_lio)/config/mid360_map.yaml" />
     <param name="runtime_pos_log_enable" type="bool" value="false" />
 
     <!-- 4. 可视化降采样节点（减少RViz负载） -->

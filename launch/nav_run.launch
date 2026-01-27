@@ -3,43 +3,52 @@
     
     <arg name="rviz" default="true" />
     <arg name="cmd_vel_topic" default="/cmd_vel_nav" />
-    <arg name="map_pcd" default="$(find kuavo_slam)/maps/map_demo/map_demo_final.pcd" />
-    <arg name="map_yaml" default="$(find kuavo_slam)/maps/map_demo/map_demo.yaml" />
-
-    <!-- 1. 加载参数 -->
-    <rosparam command="load" file="$(find kuavo_slam)/config/mid360_nav.yaml" />
-    <param name="feature_extract_enable" type="bool" value="0"/>
-    <param name="point_filter_num" type="int" value="3"/>
-    <param name="filter_size_surf" type="double" value="0.5" />
+    <!-- 地图相关参数 -->
+    <arg name="map_path" default="$(find kuavo_slam)/maps" />
+    <arg name="map_name" default="map_demo" />
+    <arg name="map_pcd" default="$(arg map_path)/$(arg map_name)/pointcloud.pcd" />
+    <arg name="map_yaml" default="$(arg map_path)/$(arg map_name)/map2d.yaml" />
+    <arg name="config_dir" default="$(find kuavo_slam)/config" />
+    <arg name="base_global_planner" default="global_planner" /> <!--"navfn" or "global_planner" -->
+    <arg name="base_local_planner" default="teb_local_planner" />
+    <arg name="nav_base_frame" default="base_link" />
+    <arg name="odom_topic" default="/localization" />
+    <arg name="local_costmap_global_frame" default="map" />
     
-    <!-- 2. 运行livox_ros_driver2节点 (只定位，不建图) -->
+    <!-- 运行livox_ros_driver2节点 (只定位，不建图) -->
     <include file="$(find livox_ros_driver2)/launch_ROS1/autolevel_MID360.launch">
         <arg name="rviz_enable" value="false" />
-        <arg name="xfer_format" value="0" />
+        <arg name="xfer_format" value="1" />
         <arg name="output_type" value="0" />
     </include>
 
-    <!-- 3. 全局 ICP 定位 (从 kuavo_slam 运行) -->
+	<!-- Faster-LIO -->
+	<rosparam command="load" file="$(find faster_lio)/config/mid360_loc.yaml" />
+	<param name="feature_extract_enable" type="bool" value="0"/>
+	<param name="point_filter_num" type="int" value="3"/>
+	<param name="max_iteration" type="int" value="3" />
+	<param name="filter_size_surf" type="double" value="0.1" />
+	<param name="filter_size_map" type="double" value="0.1" />
+	<param name="cube_side_length" type="double" value="1000" />
+	<param name="runtime_pos_log_enable" type="bool" value="false" />
+	<node pkg="faster_lio" type="run_mapping_online" name="laserMapping"
+          output="log" launch-prefix="bash -c 'exec &quot;$@&quot; >/dev/null 2>/dev/null' --" />
+	<param name="use_sim_time" value="false" />
+
+    <!-- 发布全局点云地图 -->
+    <node pkg="pcl_ros" type="pcd_to_pointcloud" name="map_publisher" output="screen" args="$(arg map_pcd) 5 _frame_id:=map cloud_pcd:=map" />
+    <!-- 全局 ICP 定位 -->
     <node pkg="kuavo_slam" type="global_localization.py" name="global_localization" output="screen" />
-
-    <!-- 4. 坐标系融合 (从 kuavo_slam 运行) -->
+    <!-- 坐标系融合 -->
     <node pkg="kuavo_slam" type="transform_fusion.py" name="transform_fusion" output="screen" />
-
-    <!-- 5. 可视化 -->
-    <group if="$(arg rviz)">
-        <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find kuavo_slam)/rviz/nav_global.rviz" />
-    </group>
     
-    <!-- 6. 发布全局点云地图 (PCD) -->
-    <node pkg="pcl_ros" type="pcd_to_pointcloud" name="map_publisher" output="screen" args="$(arg map_pcd) 5 _frame_id:=world cloud_pcd:=map" />
-
-    <!-- 7. 发布 2D 栅格地图 -->
+    <!-- 发布 2D 栅格地图 -->
     <node pkg="map_server" type="map_server" name="map_server" args="$(arg map_yaml)">
-        <param name="frame_id" value="world" />
+        <param name="frame_id" value="map" />
         <remap from="/map" to="/map2d" />
     </node>
 
-    <!-- 8. 点云转激光雷达数据 (用于避障) -->
+    <!-- 点云转激光雷达数据 (用于避障) -->
     <node pkg="tf" type="static_transform_publisher" name="base_link_2d" args="0 0 0 0 0 0 base_link base_link_2d_nav 100" />
     <node pkg="pointcloud_to_laserscan" type="pointcloud_to_laserscan_node" name="pointcloud_to_laserscan">
         <remap from="cloud_in" to="/cur_scan_in_map"/>
@@ -48,23 +57,15 @@
         <param name="concurrency_level" value="1" />
         <param name="angle_increment" value="0.004" />
         <param name="scan_time" value="0.04" />
-        <param name="range_min" value="0.05" />
+        <param name="range_min" value="0.25" />
         <param name="range_max" value="30.0" />
         <param name="transform_tolerance" value="0.01" />
         <param name="min_height" value="-1.4" />
-        <param name="max_height" value="0.8" />
+        <param name="max_height" value="0.4" />
         <param name="angle_min" value="-1.5708" />
         <param name="angle_max" value="1.5708" />
     </node>
 
-    <arg name="config_dir" default="$(find kuavo_slam)/config" />
-    <arg name="base_global_planner" default="global_planner" /> <!--"navfn" or "global_planner" -->
-    <arg name="base_local_planner" default="teb_local_planner" />
-    <arg name="nav_base_frame" default="base_link" />
-    <arg name="odom_topic" default="/localization" />
-    <arg name="local_costmap_global_frame" default="world" />
-
-    <node pkg="tf" type="static_transform_publisher" name="world_to_map" args="0 0 0 0 0 0 map world 100" />
     <!-- 启动 move_base -->
     <node pkg="move_base" type="move_base" name="move_base" output="screen">
         <rosparam file="$(arg config_dir)/nav_2d/$(arg base_global_planner)_params.yaml" command="load" />
@@ -95,5 +96,11 @@
         <param name="local_costmap/robot_base_frame" value="$(arg nav_base_frame)"/>
         <param name="local_costmap/global_frame" value="$(arg local_costmap_global_frame)"/>
     </node>
+
+
+    <!-- 可视化 -->
+    <group if="$(arg rviz)">
+        <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find kuavo_slam)/rviz/nav_global.rviz" />
+    </group>
 
 </launch>
