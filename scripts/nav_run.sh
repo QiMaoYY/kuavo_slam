@@ -1,225 +1,87 @@
 #!/bin/bash
 # Kuavo SLAM 导航启动脚本
-# 功能：启动雷达驱动 -> 全局定位 -> 坐标系融合 -> 可视化
-# 用法：./nav_run.sh
+# 功能：启动环境 -> (可选)自动校准 -> 启动导航
+# 用法：
+#   ./nav_run.sh <MAP_NAME> <MAP_ROOT> <RVIZ:true|false> <CALIB:true|false>
+# 例子：
+#   ./nav_run.sh map_demo /media/data/slam_ws/src/kuavo_slam/maps true true
 
 set -e  # 遇到错误立即退出
-
 # ============== 配置参数 ==============
-LIVOX_WS="/media/data/livox_ws"
 SLAM_WS="/media/data/slam_ws"
-MAP_SAVE_DIR="${SLAM_WS}/src/kuavo_slam/PCD"
-FASTER_LIO_PCD_DIR="${SLAM_WS}/src/faster-lio/PCD"
 
-# 默认需要校准
-NEED_CALIBRATION=true
+usage() {
+  cat <<'EOF'
+用法:
+  ./nav_run.sh <MAP_NAME> <MAP_ROOT> <RVIZ:true|false> <CALIB:true|false>
 
-# 解析命令行参数
-for arg in "$@"; do
-    case $arg in
-        --no-calib|--skip-calib)
-            NEED_CALIBRATION=false
-            shift
-            ;;
-        --help|-h)
-            echo "用法: $0 [选项]"
-            echo "选项:"
-            echo "  --no-calib, --skip-calib    跳过雷达校准步骤"
-            echo "  --help, -h                  显示此帮助信息"
-            exit 0
-            ;;
-    esac
-done
+参数:
+  MAP_NAME   地图名 (默认: map_demo)
+  MAP_ROOT   地图根目录 (默认: /media/data/slam_ws/src/kuavo_slam/maps)
+  RVIZ       是否启动 RViz: true/false (默认: true)
+  CALIB      是否执行自动校准: true/false (默认: true)
 
-# ============== 颜色输出 ==============
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
-# ============== 函数定义 ==============
-info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+示例:
+  ./nav_run.sh map_demo /media/data/slam_ws/src/kuavo_slam/maps true false
+EOF
 }
 
-success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
+parse_bool() {
+  # 输出: "true" 或 "false"
+  # 接受: true/false/1/0/yes/no/on/off (不区分大小写)
+  local v
+  v="$(echo "${1:-}" | tr '[:upper:]' '[:lower:]')"
+  case "$v" in
+    true|1|yes|y|on)  echo "true" ;;
+    false|0|no|n|off) echo "false" ;;
+    *) return 1 ;;
+  esac
 }
 
-warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
+# ============== 命令行参数（四个核心参数） ==============
+MAP_NAME="${1:-map_demo}"
+MAP_ROOT="${2:-/media/data/slam_ws/src/kuavo_slam/maps}"
+RVIZ_RAW="${3:-true}"
+CALIB_RAW="${4:-true}"
 
-error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
+if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+  usage
+  exit 0
+fi
 
-# 清理函数
-cleanup() {
-    info "正在清理并关闭所有节点..."
-    
-    # 温和地结束进程（给它们时间保存数据）
-    info "  停止建图节点..."
-    killall -INT run_mapping_online 2>/dev/null || true
-    sleep 1
-    
-    info "  停止雷达驱动..."
-    killall -INT roslaunch 2>/dev/null || true
-    sleep 1
-    
-    info "  停止可视化..."
-    killall -INT rviz 2>/dev/null || true
-    sleep 1
-    
-    # 如果还有残留，强制杀死
-    killall -9 roslaunch 2>/dev/null || true
-    killall -9 rviz 2>/dev/null || true
-    killall -9 run_mapping_online 2>/dev/null || true
-    
-    # 清理 ROS 节点（设置超时避免卡死）
-    info "  清理 ROS 节点..."
-    timeout 3 rosnode kill -a 2>/dev/null || true
-    
-    # 关闭 rosmaster（如果是脚本启动的）
-    killall -9 rosmaster 2>/dev/null || true
-    killall -9 roscore 2>/dev/null || true
-    
-    success "清理完成"
-}
+if ! RVIZ="$(parse_bool "$RVIZ_RAW")"; then
+  echo "错误: RVIZ 参数非法: '$RVIZ_RAW' (需要 true/false)" >&2
+  usage
+  exit 2
+fi
 
-# 中断处理函数
-handle_interrupt() {
-    echo ""
-    warn "检测到中断信号 (Ctrl+C)，正在安全关闭..."
-    
-    # 停止所有后台进程
-    killall -INT roslaunch 2>/dev/null || true
-    sleep 2
-    
-    
-    # 清理
-    cleanup
-    
-    echo ""
-    success "========================================="
-    success "  导航流程完成！"
-    success "========================================="
-    
-    exit 0
-}
+if ! NEED_CALIBRATION="$(parse_bool "$CALIB_RAW")"; then
+  echo "错误: CALIB 参数非法: '$CALIB_RAW' (需要 true/false)" >&2
+  usage
+  exit 2
+fi
 
+# 激活conda环境
+source ~/miniconda3/etc/profile.d/conda.sh
+conda activate demo
 
-# ============== 主流程 ==============
-main() {
-    echo ""
-    info "========================================="
-    info "   Kuavo SLAM 导航启动脚本"
-    info "========================================="
-    echo ""
-    
-    # 1. 自动加载 ROS 环境
-    if [ -z "$ROS_ROOT" ]; then
-        info "ROS 环境未初始化，正在自动加载..."
-        if [ -f "/opt/ros/noetic/setup.bash" ]; then
-            source /opt/ros/noetic/setup.bash
-        elif [ -f "/opt/ros/melodic/setup.bash" ]; then
-            source /opt/ros/melodic/setup.bash
-        else
-            error "未找到 ROS 安装，请手动 source ROS 环境"
-            exit 1
-        fi
-    fi
-    
-    # 2. Source 工作空间
-    info "加载 SLAM 工作空间..."
-    if [ -f "${SLAM_WS}/devel/setup.bash" ]; then
-        source "${SLAM_WS}/devel/setup.bash"
-    else
-        error "未找到 SLAM 工作空间: ${SLAM_WS}/devel/setup.bash"
-        exit 1
-    fi
-    
-    info "加载 Livox 工作空间..."
-    if [ -f "${LIVOX_WS}/devel/setup.bash" ]; then
-        source "${LIVOX_WS}/devel/setup.bash"
-    else
-        warn "未找到 Livox 工作空间: ${LIVOX_WS}/devel/setup.bash"
-        info "将使用系统中已安装的 livox_ros_driver2"
-    fi
-    
-    # 3. 启动 roscore（如果未运行）
-    if ! rostopic list &>/dev/null; then
-        info "启动 roscore..."
-        roscore &
-        sleep 3
-    fi
+source /opt/ros/noetic/setup.bash
+source ~/kuavo_data_pilot/devel/setup.bash
+python3 /media/data/slam_ws/src/kuavo_slam/scripts/head.py
 
-    # 4. 自动校准（如果需要）
-    if [ "$NEED_CALIBRATION" = true ]; then
-        info "========================================="
-        info "  开始自动校准 MID360 雷达"
-        info "========================================="
-        python3 ${LIVOX_WS}/src/livox_ros_driver2/scripts/mid360_autolevel_calib.py \
-            --duration 3.0 \
-            --timeout 10.0 \
-            --imu-topic /livox/imu \
-            --lidar-topic /livox/lidar \
-            --fasterlio-yaml ${SLAM_WS}/src/faster-lio/config/mid360.yaml
-        
-        if [ $? -eq 0 ]; then
-            success "自动校准完成！"
-        else
-            error "校准失败，请检查雷达连接"
-            exit 1
-        fi
-        
-        info "========================================="
-        echo ""
-    else
-        warn "跳过校准步骤（使用已有外参）"
-        echo ""
-    fi
+source "${SLAM_WS}/devel/setup.bash"
+source "${SLAM_WS}/livox_ws/devel/setup.bash"
 
-    # 5. 启动导航
-    info "启动导航..."
-    roslaunch kuavo_slam nav_run.launch \
-        rviz:=true \
-        &
-    NAV_PID=$!
-    
-    echo ""
-    success "导航已启动！"
-    info "========================================="
-    echo ""
-    
-    # 6. 等待用户中断（Ctrl+C）
-    trap handle_interrupt SIGINT SIGTERM
-    
-    echo ""
-    info "导航正在进行中..."
-    info "按 Ctrl+C 停止导航"
-    echo ""
-    
-    # 持续等待（直到用户按 Ctrl+C 或进程结束）
-    while kill -0 $NAV_PID 2>/dev/null; do
-        sleep 1
-    done
-    
-    # 7. 如果进程自然结束（未被中断），执行保存
-    echo ""
-    info "导航进程已结束"
-    sleep 3  # 等待文件写入完成
-    
-    # 8. 清理
-    cleanup
-    
-    echo ""
-    success "========================================="
-    success "  导航流程完成！"
-    success "========================================="
-}
+# 自动校准（如果需要）
+if [ "$NEED_CALIBRATION" = true ]; then
+    python3 ${SLAM_WS}/livox_ws/src/livox_ros_driver2/scripts/mid360_autolevel_calib.py \
+        --duration 3.0 \
+        --timeout 10.0 \
+        --imu-topic /livox/imu \
+        --lidar-topic /livox/lidar \
+        --fasterlio-yaml ${SLAM_WS}/src/faster-lio/config/
+fi
 
-# ============== 脚本入口 ==============
-main "$@"
+# 启动导航
+roslaunch kuavo_slam nav_run.launch rviz:=${RVIZ} map_path:=${MAP_ROOT} map_name:=${MAP_NAME}
 
