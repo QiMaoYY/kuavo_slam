@@ -37,5 +37,7 @@ devel/
 .DS_Store
 Thumbs.db
 
+# 备份文件
+*.bak
 
 
