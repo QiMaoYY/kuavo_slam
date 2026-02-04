@@ -1,60 +1,73 @@
 TebLocalPlannerROS:
 
-  odom_topic: odom
-    
-  max_vel_x: 0.3
-  max_vel_x_backwards: 0.15
-  max_vel_theta: 0.6
-  acc_lim_x: 0.2
-  acc_lim_theta: 0.3
-  
-  teb_autosize: true
-  dt_ref: 0.3
-  dt_hysteresis: 0.1
-  global_plan_overwrite_orientation: false
-  max_global_plan_lookahead_dist: 1.8
+  # ==================== 话题配置 ====================
+  odom_topic: odom                      # 里程计话题名称
 
-  min_turning_radius: 0.0
+  # ==================== 速度与加速度限制 ====================
+  max_vel_x: 0.3                        # 最大前向线速度 (m/s)
+  max_vel_x_backwards: 0.15             # 最大后退线速度 (m/s)
+  max_vel_y: 0.0                        # 最大横向速度 (m/s)，全向机器人需配置，差速机器人设为0或不配置
+  max_vel_theta: 0.6                    # 最大角速度 (rad/s)
+  acc_lim_x: 0.2                        # 最大前向加速度 (m/s^2)
+  acc_lim_y: 0.0                        # 最大横向加速度 (m/s^2)，全向机器人需配置
+  acc_lim_theta: 0.3                    # 最大角加速度 (rad/s^2)
 
+  # ==================== 轨迹配置 ====================
+  teb_autosize: true                    # 是否自动调整轨迹时间分辨率
+  dt_ref: 0.3                           # 轨迹时间分辨率参考值 (s)，两个相邻姿态之间的期望时间间隔
+  dt_hysteresis: 0.1                    # 时间分辨率的滞后阈值 (s)，用于自动调整时防止频繁切换
+  global_plan_overwrite_orientation: false  # 是否用局部规划器的朝向覆盖全局规划的朝向
+  max_global_plan_lookahead_dist: 1.8   # 从全局路径中提取的最大前瞻距离 (m)
+
+  # ==================== 运动学约束 ====================
+  min_turning_radius: 0.0               # 最小转弯半径 (m)，0表示可原地转向（差速驱动），阿克曼模型需设置大于0
+
+  # ==================== 机器人轮廓模型 ====================
   footprint_model:
-    type: "circular"
-    radius: 0.3
-    is_footprint_dynamic: False
-  
-  xy_goal_tolerance: 0.5
-  yaw_goal_tolerance: 0.2 #6.28
+    type: "circular"                    # 轮廓类型：circular(圆形)/point(点)/line(线)/two_circles/polygon(多边形)
+    radius: 0.3                         # 圆形轮廓的半径 (m)
+    is_footprint_dynamic: False         # 轮廓是否动态变化
 
-  min_obstacle_dist: 0.1
-  include_costmap_obstacles: True
-  costmap_obstacles_behind_robot_dist: 1.0
+  # ==================== 目标容差 ====================
+  xy_goal_tolerance: 0.5                # 到达目标点的位置容差 (m)
+  yaw_goal_tolerance: 0.2               # 到达目标点的航向角容差 (rad)，约11.5度
 
-  inflation_dist: 0.3
-  weight_inflation: 0.1
+  # ==================== 障碍物配置 ====================
+  min_obstacle_dist: 0.1                # 与障碍物的最小距离 (m)
+  include_costmap_obstacles: True       # 是否考虑代价地图中的障碍物
+  costmap_obstacles_behind_robot_dist: 1.0  # 考虑机器人后方障碍物的最大距离 (m)
 
-  no_inner_iterations: 3
-  no_outer_iterations: 3
-  penalty_epsilon: 0.05
-  weight_max_vel_x: 2
-  weight_max_vel_theta: 1
-  weight_acc_lim_x: 1
-  weight_acc_lim_theta: 1
-  weight_kinematics_nh: 100
-  weight_kinematics_forward_drive: 100
-  weight_kinematics_turning_radius: 100
-  weight_optimaltime: 1
-  weight_obstacle: 50
+  # ==================== 膨胀配置 ====================
+  inflation_dist: 0.3                   # 障碍物膨胀距离 (m)，在此距离内会有惩罚
+  weight_inflation: 0.1                 # 膨胀惩罚的权重
 
-  enable_homotopy_class_planning: false
-  enable_multithreading: true
-  max_number_classes: 2
-  selection_cost_hysteresis: 1.0
-  selection_obst_cost_scale: 100.0
-  selection_alternative_time_cost: False
-  roadmap_graph_no_samples: 5
-  roadmap_graph_area_width: 1.0
+  # ==================== 优化参数 ====================
+  no_inner_iterations: 3                # 内部优化迭代次数
+  no_outer_iterations: 3                # 外部优化迭代次数
+  penalty_epsilon: 0.05                 # 惩罚函数中用于软约束的epsilon值
+  weight_max_vel_x: 2                   # 最大前向速度约束的权重
+  weight_max_vel_theta: 1               # 最大角速度约束的权重
+  weight_acc_lim_x: 1                   # 前向加速度限制的权重
+  weight_acc_lim_theta: 1               # 角加速度限制的权重
+  weight_kinematics_nh: 100             # 【关键】非完整运动学约束的权重，值越大越严格限制横向运动
+  weight_kinematics_forward_drive: 100  # 【关键】前向行驶偏好的权重，值越大越倾向于前进而非后退
+  weight_kinematics_turning_radius: 100 # 最小转弯半径约束的权重（用于阿克曼/类车模型）
+  weight_optimaltime: 1                 # 时间最优的权重，值越大轨迹越快
+  weight_obstacle: 50                   # 障碍物惩罚权重
 
-  global_plan_viapoint_sep: 0.5
-  weight_viapoint: 10.0
-  viapoints_all_candidates: False
-  selection_viapoint_cost_scale: 1.0
+  # ==================== 同伦类规划 (多路径探索) ====================
+  enable_homotopy_class_planning: false # 是否启用同伦类规划（探索多条不同拓扑路径）
+  enable_multithreading: true           # 是否启用多线程加速
+  max_number_classes: 2                 # 同伦类的最大数量
+  selection_cost_hysteresis: 1.0        # 路径选择的代价滞后系数
+  selection_obst_cost_scale: 100.0      # 障碍物代价在路径选择中的缩放系数
+  selection_alternative_time_cost: False # 是否使用替代的时间代价计算方法
+  roadmap_graph_no_samples: 5           # 用于探索同伦类的路线图采样点数
+  roadmap_graph_area_width: 1.0         # 路线图采样区域宽度 (m)
+
+  # ==================== 途经点配置 ====================
+  global_plan_viapoint_sep: 0.5         # 从全局路径提取途经点的间隔距离 (m)
+  weight_viapoint: 10.0                 # 途经点吸引力的权重
+  viapoints_all_candidates: False       # 是否为所有候选轨迹添加途经点
+  selection_viapoint_cost_scale: 1.0    # 途经点代价在路径选择中的缩放系数
 
